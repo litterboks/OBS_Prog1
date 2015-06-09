@@ -18,7 +18,7 @@ clean:
 	find . -name "*.o" -type f -delete
 
 zip: clean
-	        zip -r mikovits_if14b062_steinberger_if14b049.zip . -x .git/ -x .gitignore -x .git/**\* -x *.pdf -x *.in -x inputs/
+	        zip -r OBS_Prog1_if14b062_if14b049.zip . -x .git/ -x .gitignore -x .git/**\* -x *.pdf -x *.in -x inputs/
 
 
 run: all
