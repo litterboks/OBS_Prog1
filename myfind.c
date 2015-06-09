@@ -21,8 +21,8 @@ void searchRecurse();
 int main(int argc, char* argv[])
 {
 	program_name = argv[0];
-	pid_t pid;//, wpid;
-	char buf[PATH_MAX + 1];
+	pid_t pid, wpid;
+	int status = 0;
 	int c;
 	int countOpti = 0;
 	int countOptR = 0;
@@ -37,32 +37,48 @@ int main(int argc, char* argv[])
 			}
 			break;
 		case 'R':
-			if (countOpti >= 1) {
+			if (countOptR >= 1) {
 				print_usage();
 			} else {
 				countOptR = 1;
 			}
 			break;
+		case '?':
+			print_usage();
+			break;
 		default:
 			print_usage();
 		}
 	}
-	for (int i = 0; optind + 1 + i < argc; i++) {
+//Wenn kein Pfad und Dateiname angegeben wurden usage ausgeben
+	if (argc < optind + 2) {
+		print_usage();
+	}
+
+//Absoluten Pfad ermitteln
+	char buf[PATH_MAX + 1];
+	char* absolute_path = realpath(argv[optind++], buf);
+
+//Prozesse für jedes Suchwort angeben
+	while (optind < argc) {
 
 		switch (pid = fork()) {
-		case 1:
+		case -1:
 			printf("Error at fork()");
 			break;
 		case 0:
-			realpath(argv[optind], buf);
-			search(buf, argv[optind + 1 + i], countOpti, countOptR);
+			search(absolute_path, argv[optind], countOpti, countOptR);
 			return 0;
 
 		default:
-			break;
+			;
 		}
+		//Nächstes Suchwort
+		optind++;
 	}
-	wait(NULL);
+	while ((wpid = wait(&status)) > 0) {
+	//	printf("Exit status of %d was %d\n", (int)wpid, status);
+	}
 	return 0;
 }
 
@@ -71,11 +87,17 @@ void search(char* directory, char* filename, int countOpti, int countOptR)
 	//Gewünschtes Format:
 	//<pid>: <filename>: <complete-path-to-found-file>\n
 	struct dirent *direntp;
-	//pid_t pid;
 	DIR *dirp;
 	char subdir[PATH_MAX + 1];
-	dirp = opendir(directory);
+
+	//Verzeichnis öffnen mit Fehlerabfrage
+	if ((dirp = opendir(directory)) == NULL) {
+		printf("%d: Failed to open directory %s\n",(int)getpid(), directory);
+		return;
+	}
+	//Verzeichnis lesen
 	while ((direntp = readdir(dirp))) {
+		//Case insensitive
 		if (countOpti < 0) {
 			if (strcmp(direntp->d_name, filename) == 0) {
 				if (strcmp(directory, "/") != 0) {
@@ -84,6 +106,7 @@ void search(char* directory, char* filename, int countOpti, int countOptR)
 					printf("%d: %s: /%s\n", (int)getpid(), direntp->d_name, direntp->d_name);
 				}
 			}
+		//Case sensitive
 		} else {
 
 			if (strcasecmp(direntp->d_name, filename) == 0) {
@@ -94,33 +117,26 @@ void search(char* directory, char* filename, int countOpti, int countOptR)
 				}
 			}
 		}
+		//Rekursion
 		if (countOptR != 0) {
 			if (direntp->d_type == 4) {
 				if (strcmp(direntp->d_name, "..") != 0 && strcmp(direntp->d_name, ".") != 0) {
-					//switch (pid = fork()) {
-					//case 0:
 					strcpy(subdir, directory);
 					if (strcmp(directory, "/") != 0) {
 						strcat(subdir, "/");
 					}
 					strcat(subdir, direntp->d_name);
-					//printf("%s\n",subdir);
 					search(subdir, filename, countOpti, countOptR);
-					//return;
-					//default:
-					//	wait(NULL);
 				}
 			}
 		}
 	}
 	closedir(dirp);
+	return;
 }
-//}
 
 void print_usage()
 {
 	fprintf(stderr, "Usage: %s directory_name\n", program_name);
 	exit(1);
 }
-
-
